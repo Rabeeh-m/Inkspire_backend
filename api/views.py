@@ -53,18 +53,10 @@ class UserTokenObtainPairView(TokenObtainPairView):
         return token
     
 
-# class RegisterView(generics.CreateAPIView):
-#     queryset = api_models.User.objects.all()
-#     permission_classes = (AllowAny,)
-#     serializer_class = api_serializer.RegisterSerializer
-    
-    
-
 def generate_numeric_otp(length=6):
         # Generate a random 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(length)])
         return otp
- 
  
  
 
@@ -91,15 +83,6 @@ class RegisterView(APIView):
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=[email]
         )
-        
-        # try:
-        #     subject="Your OTP for Registration",
-        #     message=f"Your OTP is: {otp}",
-        #     from_email=settings.EMAIL_HOST_USER,
-        #     recipient_list=[email]
-        #     send_mail(subject, message, from_email, recipient_list)
-        # except Exception as e:
-        #     print(f"Error sending email: {e}")
 
         return Response({"message": "OTP sent to your email."})
  
@@ -130,8 +113,6 @@ class VerifyOTPView(APIView):
  
  
  
- 
- 
 class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = api_serializer.ProfileSerializer
@@ -144,67 +125,180 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
  
 
-class PasswordEmailVerify(generics.RetrieveAPIView):
-    permission_classes = (AllowAny,)
-    serializer_class = api_serializer.UserSerializer
+# class PasswordEmailVerify(generics.RetrieveAPIView):
+#     permission_classes = (AllowAny,)
+#     serializer_class = api_serializer.UserSerializer
     
-    def get_object(self):
-        email = self.kwargs['email']
-        user = api_models.User.objects.get(email=email)
+#     def get_object(self):
+#         email = self.kwargs['email']
+#         user = api_models.User.objects.get(email=email)
         
-        if user:
-            user.otp = generate_numeric_otp()
-            uidb64 = user.pk
+#         if user:
+#             user.otp = generate_numeric_otp()
+#             uidb64 = user.pk
             
-             # Generate a token and include it in the reset link sent via email
-            refresh = RefreshToken.for_user(user)
-            reset_token = str(refresh.access_token)
+#              # Generate a token and include it in the reset link sent via email
+#             refresh = RefreshToken.for_user(user)
+#             reset_token = str(refresh.access_token)
 
-            # Store the reset_token in the user model for later verification
-            user.reset_token = reset_token
-            user.save()
+#             # Store the reset_token in the user model for later verification
+#             user.reset_token = reset_token
+#             user.save()
 
-            link = f"http://localhost:5173/create-new-password?otp={user.otp}&uidb64={uidb64}&reset_token={reset_token}"
+#             link = f"http://localhost:5173/create-new-password?otp={user.otp}&uidb64={uidb64}&reset_token={reset_token}"
             
-            merge_data = {
-                'link': link, 
-                'username': user.username, 
-            }
-            subject = f"Password Reset Request"
-            text_body = render_to_string("email/password_reset.txt", merge_data)
-            html_body = render_to_string("email/password_reset.html", merge_data)
+#             merge_data = {
+#                 'link': link, 
+#                 'username': user.username, 
+#             }
+#             subject = f"Password Reset Request"
+#             text_body = render_to_string("email/password_reset.txt", merge_data)
+#             html_body = render_to_string("email/password_reset.html", merge_data)
             
-            msg = EmailMultiAlternatives(
-                subject=subject, from_email=settings.FROM_EMAIL,
-                to=[user.email], body=text_body
-            )
-            msg.attach_alternative(html_body, "text/html")
-            msg.send()
-        return user
+#             msg = EmailMultiAlternatives(
+#                 subject=subject, from_email=settings.FROM_EMAIL,
+#                 to=[user.email], body=text_body
+#             )
+#             msg.attach_alternative(html_body, "text/html")
+#             msg.send()
+#         return user
     
 
-class PasswordChangeView(generics.CreateAPIView):
-    permission_classes = (AllowAny,)
-    serializer_class = api_serializer.UserSerializer
+# class PasswordChangeView(generics.CreateAPIView):
+#     permission_classes = (AllowAny,)
+#     serializer_class = api_serializer.UserSerializer
     
-    def create(self, request, *args, **kwargs):
-        payload = request.data
+#     def create(self, request, *args, **kwargs):
+#         payload = request.data
         
-        otp = payload['otp']
-        uidb64 = payload['uidb64']
-        password = payload['password']
+#         otp = payload['otp']
+#         uidb64 = payload['uidb64']
+#         password = payload['password']
 
         
 
-        user = api_models.User.objects.get(id=uidb64, otp=otp)
-        if user:
-            user.set_password(password)
-            user.otp = ""
-            user.save()
+#         user = api_models.User.objects.get(id=uidb64, otp=otp)
+#         if user:
+#             user.set_password(password)
+#             user.otp = ""
+#             user.save()
             
-            return Response( {"message": "Password Changed Successfully"}, status=status.HTTP_201_CREATED)
-        else:
-            return Response( {"message": "An Error Occured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#             return Response( {"message": "Password Changed Successfully"}, status=status.HTTP_201_CREATED)
+#         else:
+#             return Response( {"message": "An Error Occured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.core.mail import send_mail
+from django.contrib.auth.hashers import make_password
+import random
+import redis
+
+# Redis configuration for OTP storage
+redis_instance = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = api_models.User.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+        otp = random.randint(100000, 999999)
+        redis_instance.setex(f"forgot-password-otp-{email}", 300, otp)  # OTP expires in 5 minutes
+
+        send_mail(
+            "Your Password Reset OTP",
+            f"Your OTP for password reset is {otp}.",
+            "noreply@yourdomain.com",
+            [email],
+        )
+
+        return Response({"message": "OTP has been sent to your email."}, status=status.HTTP_200_OK)
+
+
+class VerifyForgotPasswordOTPView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+
+        if not email or not otp:
+            return Response({"error": "Email and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        stored_otp = redis_instance.get(f"forgot-password-otp-{email}")
+        if not stored_otp or stored_otp.decode() != otp:
+            return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"message": "OTP verified."}, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+
+        if not email or not new_password:
+            return Response({"error": "Email and new password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = api_models.User.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.password = make_password(new_password)
+        user.save()
+
+        return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+
+
+
+from django.contrib.auth.hashers import check_password
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from rest_framework import status
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [AllowAny]  # Allow unauthenticated users
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        email = data.get("email")
+        old_password = data.get("old_password")
+        new_password = data.get("new_password")
+        confirm_password = data.get("confirm_password")
+
+        if not email or not old_password or not new_password or not confirm_password:
+            return Response({"detail": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = api_models.User.objects.get(email=email)
+        except api_models.User.DoesNotExist:
+            return Response({"detail": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_password(old_password, user.password):
+            return Response({"detail": "Old password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"detail": "New passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
+
+    
+     
+        
+        
         
         
            

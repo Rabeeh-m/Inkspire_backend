@@ -13,8 +13,14 @@ urlpatterns = [
     
     path('user/profile/<user_id>/', api_views.ProfileView.as_view(), name='user_profile'),
     path('user/profiles/<user_id>/', api_views.ProfilesListView.as_view(), name='user_profile'),
-    path('user/password-reset/<email>/', api_views.PasswordEmailVerify.as_view(), name='password_reset'),
-    path('user/password-change/', api_views.PasswordChangeView.as_view(), name='password_reset'),
+    # path('user/forgot-password/<email>/', api_views.ForgotPasswordView.as_view(), name='password_reset'),
+    # path('user/reset-password/', api_views.ResetPasswordView.as_view(), name='password_reset'),
+    path('user/forgot-password/', api_views.ForgotPasswordView.as_view(), name='forgot-password'),
+    path('user/verify-forgotpassword-otp/', api_views.VerifyForgotPasswordOTPView.as_view(), name='verify-forgotpassword-otp'),
+    path('user/reset-password/', api_views.ResetPasswordView.as_view(), name='reset-password'),
+    path('user/change-password/', api_views.ChangePasswordView.as_view(), name="change-password"),
+
+    
     
     # Post Endpoints
     path('post/category/list/', api_views.CategoryListAPIView.as_view()),
