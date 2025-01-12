@@ -1,5 +1,5 @@
 from django.db import models
-
+from django_ckeditor_5.fields import CKEditor5Field
 # Create your models here.
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
@@ -7,6 +7,8 @@ from django.utils.text import slugify
 
 from shortuuid.django_fields import ShortUUIDField
 import shortuuid
+from django.conf import settings
+from django.utils.timezone import now, timedelta
         
 
 class User(AbstractUser):
@@ -16,6 +18,7 @@ class User(AbstractUser):
     otp = models.CharField(max_length=10, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
+    is_premium = models.BooleanField(default=False)
     
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -103,7 +106,7 @@ class Post(models.Model):
     title = models.CharField(max_length=100)
     slug = models.SlugField(unique=True, null=True, blank=True)
     thumbnail_image = models.FileField(upload_to="image", null=True, blank=True)
-    content = models.TextField(null=True, blank=True)
+    content = CKEditor5Field(null=True, blank=True, config_name='extends')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='posts')
     tags = models.CharField(max_length=100)
     status = models.CharField(max_length=100, choices=STATUS, default="Draft")
@@ -128,16 +131,23 @@ class Post(models.Model):
     def comments(self):
         return Comment.objects.filter(post=self)
         
+        
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    email = models.CharField(max_length=100)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     comment = models.TextField()
-    reply = models.TextField(null=True, blank=True)
+    likes = models.ManyToManyField(User, related_name='comment_likes', blank=True)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name='replies', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.post.title} - {self.name}"
+        return self.comment[:20]
+    
+    def like_count(self):
+        return self.likes.count()
+
+    def reply_count(self):
+        return self.replies.count()
     
     class Meta:
         verbose_name_plural = "Comments"
@@ -179,3 +189,15 @@ class Notification(models.Model):
             return f"{self.type} - {self.post.title}"
         else:
             return "Notification"
+        
+        
+        
+class Subscription(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    plan = models.CharField(max_length=50, default='Free')
+    status = models.CharField(max_length=50, choices=[("active", "Active"), ("expired", "Expired")], default="")
+    start_date = models.DateTimeField(auto_now_add=True)
+    end_date = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.plan}"

@@ -19,7 +19,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1", "9a00-2403-a080-1005-d601-d91d-cc80-564e-2a88.ngrok-free.app"]
 
 
 # Application definition
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_ckeditor_5',
     
     # Custom Apps
     'api',
@@ -40,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'drf_yasg',
     'corsheaders',
+    
 
     
 ]
@@ -195,3 +197,107 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+
+
+
+
+
+customColorPalette = [
+        {
+            'color': 'hsl(4, 90%, 58%)',
+            'label': 'Red'
+        },
+        {
+            'color': 'hsl(340, 82%, 52%)',
+            'label': 'Pink'
+        },
+        {
+            'color': 'hsl(291, 64%, 42%)',
+            'label': 'Purple'
+        },
+        {
+            'color': 'hsl(262, 52%, 47%)',
+            'label': 'Deep Purple'
+        },
+        {
+            'color': 'hsl(231, 48%, 48%)',
+            'label': 'Indigo'
+        },
+        {
+            'color': 'hsl(207, 90%, 54%)',
+            'label': 'Blue'
+        },
+    ]
+
+CKEDITOR_5_CONFIGS = {
+'default': {
+    'toolbar': ['heading', '|', 'bold', 'italic', 'link',
+                'bulletedList', 'numberedList', 'blockQuote', 'imageUpload', ],
+
+},
+'extends': {
+    'blockToolbar': [
+        'paragraph', 'heading1', 'heading2', 'heading3',
+        '|',
+        'bulletedList', 'numberedList',
+        '|',
+        'blockQuote',
+    ],
+    'toolbar': ['heading', '|', 'outdent', 'indent', '|', 'bold', 'italic', 'underline', 'strikethrough',
+    'highlight', '|',
+                'bulletedList', 'numberedList', 'todoList', '|', 'imageUpload', '|',
+                'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', 'mediaEmbed', 'removeFormat',
+                'insertTable',],
+    'image': {
+        'toolbar': ['imageTextAlternative', '|', 'imageStyle:alignLeft',
+                    'imageStyle:alignRight', 'imageStyle:alignCenter', 'imageStyle:side',  '|'],
+        'styles': [
+            'full',
+            'side',
+            'alignLeft',
+            'alignRight',
+            'alignCenter',
+        ]
+
+    },
+    'table': {
+        'contentToolbar': [ 'tableColumn', 'tableRow', 'mergeTableCells',
+        'tableProperties', 'tableCellProperties' ],
+        'tableProperties': {
+            'borderColors': customColorPalette,
+            'backgroundColors': customColorPalette
+        },
+        'tableCellProperties': {
+            'borderColors': customColorPalette,
+            'backgroundColors': customColorPalette
+        }
+    },
+    'heading' : {
+        'options': [
+            { 'model': 'paragraph', 'title': 'Paragraph', 'class': 'ck-heading_paragraph' },
+            { 'model': 'heading1', 'view': 'h1', 'title': 'Heading 1', 'class': 'ck-heading_heading1' },
+            { 'model': 'heading2', 'view': 'h2', 'title': 'Heading 2', 'class': 'ck-heading_heading2' },
+            { 'model': 'heading3', 'view': 'h3', 'title': 'Heading 3', 'class': 'ck-heading_heading3' }
+        ]
+    }
+},
+'list': {
+    'properties': {
+        'styles': 'true',
+        'startIndex': 'true',
+        'reversed': 'true',
+    }
+},
+'htmlSupport': {
+    'allow': [
+        {'name': '/.*/', 'attributes': True, 'classes': True, 'styles': True}
+    ]
+}
+}
+
+
+
+
+PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_CLIENT_ID')
+PAYPAL_CLIENT_SECRET = os.environ.get('PAYPAL_CLIENT_SECRET')
+PAYPAL_WEBHOOK_ID = os.environ.get('PAYPAL_WEBHOOK_ID')

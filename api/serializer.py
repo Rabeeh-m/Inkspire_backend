@@ -96,12 +96,31 @@ class CategorySerializer(BaseDepthSerializer):
         return category.posts.count()
 
 
-class CommentSerializer(BaseDepthSerializer):
+# class CommentSerializer(BaseDepthSerializer):
+#     class Meta:
+#         model = api_models.Comment
+#         fields = "__all__"
+#         default_depth = 1
+
+class ReplySerializer(serializers.ModelSerializer):
     class Meta:
         model = api_models.Comment
-        fields = "__all__"
-        default_depth = 1
+        fields = ['id', 'user', 'comment', 'created_at', 'likes', 'replies']
+        
+class CommentSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    replies = serializers.SerializerMethodField()
+    like_count = serializers.IntegerField(read_only=True)
 
+    class Meta:
+        model = api_models.Comment
+        fields = ['id', 'post', 'user', 'comment', 'likes', 'parent', 'created_at', 'replies', 'like_count']
+
+    def get_replies(self, obj):
+        replies = obj.replies.all()
+        return CommentSerializer(replies, many=True).data
+    
+    
 
 class PostSerializer(BaseDepthSerializer):
     comments = CommentSerializer(many=True, read_only=True)
@@ -131,3 +150,11 @@ class AuthorStats(serializers.Serializer):
     posts = serializers.IntegerField(default=0)
     likes = serializers.IntegerField(default=0)
     bookmarks = serializers.IntegerField(default=0)
+    
+    
+class SubscriptionSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    class Meta:
+        model = api_models.Subscription
+        fields = ['id', 'user', 'plan', 'status', 'start_date', 'end_date']
+        read_only_fields = ['start_date'] 

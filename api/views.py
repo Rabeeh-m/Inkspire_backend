@@ -9,6 +9,11 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.db.models import Sum
 
+from django.core.mail import send_mail
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password
+from django.shortcuts import get_object_or_404
+
 # Restframework
 from rest_framework import status
 from rest_framework.decorators import api_view, APIView
@@ -23,17 +28,21 @@ from rest_framework.views import APIView
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from datetime import datetime
+from datetime import timedelta
+from django.utils import timezone 
 
 # Others
 import json
 import random
 
+
 # Custom Imports
 from api import serializer as api_serializer
 from api import models as api_models
-from django.core.mail import send_mail
-from django.conf import settings
+
+
+
+
 
 # Create your views here.
 
@@ -122,82 +131,8 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         user = api_models.User.objects.get(id = user_id)
         profile = api_models.Profile.objects.get(user = user)
         return profile
-    
- 
-
-# class PasswordEmailVerify(generics.RetrieveAPIView):
-#     permission_classes = (AllowAny,)
-#     serializer_class = api_serializer.UserSerializer
-    
-#     def get_object(self):
-#         email = self.kwargs['email']
-#         user = api_models.User.objects.get(email=email)
+       
         
-#         if user:
-#             user.otp = generate_numeric_otp()
-#             uidb64 = user.pk
-            
-#              # Generate a token and include it in the reset link sent via email
-#             refresh = RefreshToken.for_user(user)
-#             reset_token = str(refresh.access_token)
-
-#             # Store the reset_token in the user model for later verification
-#             user.reset_token = reset_token
-#             user.save()
-
-#             link = f"http://localhost:5173/create-new-password?otp={user.otp}&uidb64={uidb64}&reset_token={reset_token}"
-            
-#             merge_data = {
-#                 'link': link, 
-#                 'username': user.username, 
-#             }
-#             subject = f"Password Reset Request"
-#             text_body = render_to_string("email/password_reset.txt", merge_data)
-#             html_body = render_to_string("email/password_reset.html", merge_data)
-            
-#             msg = EmailMultiAlternatives(
-#                 subject=subject, from_email=settings.FROM_EMAIL,
-#                 to=[user.email], body=text_body
-#             )
-#             msg.attach_alternative(html_body, "text/html")
-#             msg.send()
-#         return user
-    
-
-# class PasswordChangeView(generics.CreateAPIView):
-#     permission_classes = (AllowAny,)
-#     serializer_class = api_serializer.UserSerializer
-    
-#     def create(self, request, *args, **kwargs):
-#         payload = request.data
-        
-#         otp = payload['otp']
-#         uidb64 = payload['uidb64']
-#         password = payload['password']
-
-        
-
-#         user = api_models.User.objects.get(id=uidb64, otp=otp)
-#         if user:
-#             user.set_password(password)
-#             user.otp = ""
-#             user.save()
-            
-#             return Response( {"message": "Password Changed Successfully"}, status=status.HTTP_201_CREATED)
-#         else:
-#             return Response( {"message": "An Error Occured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        
-        
-        
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
-import random
-import redis
-
 # Redis configuration for OTP storage
 redis_instance = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -258,13 +193,6 @@ class ResetPasswordView(APIView):
 
 
 
-from django.contrib.auth.hashers import check_password
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework import status
-
-
 class ChangePasswordView(APIView):
     permission_classes = [AllowAny]  # Allow unauthenticated users
 
@@ -295,12 +223,7 @@ class ChangePasswordView(APIView):
 
         return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
 
-    
-     
-        
-        
-        
-        
+      
            
 class CategoryListAPIView(generics.ListAPIView):
     serializer_class = api_serializer.CategorySerializer
@@ -388,34 +311,122 @@ class LikePostAPIView(APIView):
         
 
 class PostCommentAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        user_id = request.data.get('user_id')  # Get user_id from the request
+        if not user_id:
+            return Response({"error": "The 'user_id' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fetch the User instance
+        user = get_object_or_404(api_models.User, id=user_id)
+
+        # Handle replies
+        if "comment_id" in request.data:  # This indicates it's a reply
+            try:
+                parent_comment = api_models.Comment.objects.get(id=request.data['comment_id'])
+                reply = api_models.Comment.objects.create(
+                    user=user,
+                    post=parent_comment.post,
+                    comment=request.data.get('comment'),
+                    parent=parent_comment
+                )
+                
+                 # Notification for reply
+                api_models.Notification.objects.create(
+                    user=post.user,
+                    post=post,
+                    type="Comment"
+                )
+                return Response(
+                    {"message": "Reply added successfully!", "reply": api_serializer.CommentSerializer(reply).data},
+                    status=status.HTTP_201_CREATED
+                )
+            except api_models.Comment.DoesNotExist:
+                return Response({"error": "Parent comment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Handle top-level comments
+        try:
+            post = api_models.Post.objects.get(id=request.data['post_id'])
+            comment = api_models.Comment.objects.create(
+                user=user, post=post, comment=request.data.get('comment')
+            )
+            
+            # Notification for comment
+            api_models.Notification.objects.create(
+                user=post.user,
+                post=post,
+                type="Comment"
+            )
+            return Response(
+                {"message": "Comment added successfully!", "comment": api_serializer.CommentSerializer(comment).data},
+                status=status.HTTP_201_CREATED
+            )
+        except api_models.Post.DoesNotExist:
+            return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+
+
+class PostCommentReplyAPIView(APIView):
     def post(self, request):
-        # Get data from request.data (frontend)
-        post_id = request.data['post_id']
-        name = request.data['name']
-        email = request.data['email']
-        comment = request.data['comment']
-        
-        post = api_models.Post.objects.get(id=post_id)
-        
-        # Create Comment
-        api_models.Comment.objects.create(
-            post=post,
-            name=name,
-            email=email,
+        comment_id = request.data.get("comment_id")
+        user_id = request.data.get("user_id")
+        comment = request.data.get("comment")
+
+        if not comment_id or not comment:
+            return Response({"error": "Comment ID and comment are required."}, status=400)
+
+        try:
+            parent_comment = api_models.Comment.objects.get(id=comment_id)
+        except api_models.Comment.DoesNotExist:
+            return Response({"error": "Invalid comment ID."}, status=400)
+
+        user = api_models.User.objects.get(id=user_id)
+        reply = api_models.Comment.objects.create(
+            user=user,
+            parent=parent_comment,
             comment=comment,
+            post=parent_comment.post,
         )
         
-        # Notification
+        # Notification for reply
         api_models.Notification.objects.create(
-            user=post.user,
-            post=post,
-            type="Comment",
+            user=parent_comment.user,
+            post=parent_comment.post,
+            type="Comment"
+        )
+        
+        return Response(
+            {"message": "Reply posted successfully.", "reply": api_serializer.ReplySerializer(reply).data},
+            status=201,
         )
 
-        # Return response back to the frontend
-        return Response({"message": "Commented Sent"}, status=status.HTTP_201_CREATED)
- 
- 
+        
+        
+class CommentLikeAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        comment_id = request.data.get('comment_id')
+        
+        user_id = request.data.get('user_id')  # Get user_id from the request
+        if not user_id:
+            return Response({"error": "The 'user_id' field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fetch the User instance
+        user = get_object_or_404(api_models.User, id=user_id)
+
+        try:
+            comment = api_models.Comment.objects.get(id=comment_id)
+            if user in comment.likes.all():
+                comment.likes.remove(user)
+                return Response({'success': True, 'message': 'Unliked comment.'})
+            else:
+                comment.likes.add(user)
+                return Response({'success': True, 'message': 'Liked comment.'})
+        except api_models.Comment.DoesNotExist:
+            return Response({'success': False, 'message': 'Comment not found!'}, status=404)
+
+
+
 
 class BookmarkPostAPIView(APIView):
 
@@ -530,38 +541,6 @@ class DashboardReplyCommentAPIView(APIView):
         return Response({"message": "Comment Response Sent"}, status=status.HTTP_201_CREATED)
     
 
-# class DashboardPostCreateAPIView(generics.CreateAPIView):
-#     serializer_class = api_serializer.PostSerializer
-#     permission_classes = [AllowAny]
-    
-#     def create(self, request, *args, **kwargs):
-#         print(request.data)
-#         user_id = request.data.get('user_id')
-#         title = request.data.get('title')
-#         image = request.data.get('image')
-#         description = request.data.get('description')
-#         tags = request.data.get('tags')
-#         category_id = request.data.get('category')
-#         post_status = request.data.get('post_status')
-#         profile = request.data.get('profile')
-        
-#         user = api_models.User.objects.get(id=user_id)
-#         category = api_models.Category.objects.get(id=category_id)
-        
-#         post = api_models.Post.objects.create(
-#             user=user,
-#             title=title,
-#             thumbnail_image=image,
-#             content=description,
-#             tags=tags,
-#             category=category,
-#             status=post_status,
-#             profile=profile
-           
-#         )
-        
-#         return Response({"message": "Post Created Successfully"}, status=status.HTTP_201_CREATED)
-    
 
 class DashboardPostCreateAPIView(generics.CreateAPIView):
     serializer_class = api_serializer.PostSerializer
@@ -790,3 +769,82 @@ class AdminPostEditAPIView(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         post_id = self.kwargs['post_id']
         return api_models.Post.objects.get(id=post_id)
+
+
+
+class PaypalSuccessAPIView(APIView):
+    permission_classes = [AllowAny]  # Allow any user to access this view (no authentication required)
+
+    def post(self, request):
+        try:
+            # Get the PayPal order ID from the frontend
+            order_id = request.data.get("orderID")
+            
+            # If no order ID is provided, return an error response
+            if not order_id:
+                return Response(
+                    {"success": False, "message": "Invalid order ID"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Simulate verifying the PayPal order (this should involve calling PayPal's API)
+            # For the sake of this example, we'll assume payment verification is successful
+            user_id = request.data.get("userId") 
+            user = api_models.User.objects.get(pk=user_id)
+
+            if user.is_premium:
+                return Response(
+                    {"success": False, "message": "User is already premium"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update the user's premium status
+            user.is_premium = True
+            user.save()
+
+            # Create a new Subscription record for the user
+            subscription = api_models.Subscription.objects.create(
+                user=user,
+                plan="premium",
+                status="active",
+                end_date=timezone.now() + timedelta(days=30)
+            )
+
+            return Response(
+                {"success": True, "message": "Payment successful, user upgraded!", "subscription": subscription.id},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Catch any exceptions and return a 500 response
+            return Response(
+                {"success": False, "message": "Error processing payment", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            
+            
+            
+
+class AdminSubscriptionListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        subscriptions = api_models.Subscription.objects.select_related("user").all()
+        serializer = api_serializer.SubscriptionSerializer(subscriptions, many=True)
+        return Response(serializer.data)
+
+class AdminSubscriptionUpdateView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, subscription_id):
+        try:
+            subscription = api_models.Subscription.objects.get(id=subscription_id)
+            serializer = api_serializer.SubscriptionSerializer(
+                subscription, data=request.data, partial=True
+            )
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except api_models.Subscription.DoesNotExist:
+            return Response({"error": "Subscription not found"}, status=status.HTTP_404_NOT_FOUND)

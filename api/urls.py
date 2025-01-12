@@ -9,17 +9,12 @@ urlpatterns = [
     path('user/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('user/register/', api_views.RegisterView.as_view(), name='auth_register'),
     path('user/verify-otp/', api_views.VerifyOTPView.as_view(), name='verify_otp'),
-
-    
     path('user/profile/<user_id>/', api_views.ProfileView.as_view(), name='user_profile'),
     path('user/profiles/<user_id>/', api_views.ProfilesListView.as_view(), name='user_profile'),
-    # path('user/forgot-password/<email>/', api_views.ForgotPasswordView.as_view(), name='password_reset'),
-    # path('user/reset-password/', api_views.ResetPasswordView.as_view(), name='password_reset'),
     path('user/forgot-password/', api_views.ForgotPasswordView.as_view(), name='forgot-password'),
     path('user/verify-forgotpassword-otp/', api_views.VerifyForgotPasswordOTPView.as_view(), name='verify-forgotpassword-otp'),
     path('user/reset-password/', api_views.ResetPasswordView.as_view(), name='reset-password'),
     path('user/change-password/', api_views.ChangePasswordView.as_view(), name="change-password"),
-
     
     
     # Post Endpoints
@@ -28,7 +23,9 @@ urlpatterns = [
     path('post/lists/', api_views.PostListAPIView.as_view()),
     path('post/detail/<slug>/', api_views.PostDetailAPIView.as_view()),
     path('post/like-post/', api_views.LikePostAPIView.as_view()),
-    path('post/comment-post/', api_views.PostCommentAPIView.as_view()),
+    path('post/comment-post/', api_views.PostCommentAPIView.as_view(), name='comment_post'),
+    path('post/reply-comment/', api_views.PostCommentReplyAPIView.as_view(), name='reply-comment'),
+    path('post/like-comment/', api_views.CommentLikeAPIView.as_view(), name='like_comment'),
     path('post/bookmark-post/', api_views.BookmarkPostAPIView.as_view()),
     path('post/popular-post/', api_views.PopularPostListAPIView.as_view()),
     
@@ -52,5 +49,8 @@ urlpatterns = [
     path('admin/posts-list/', api_views.AdminPostsListAPIView.as_view(), name='admin_posts_list'),
     path('admin/post-delete/<int:post_id>/', api_views.AdminPostDeleteAPIView.as_view()),
     path('admin/posts/<int:post_id>/', api_views.AdminPostEditAPIView.as_view()),
+    path("admin/subscriptions/", api_views.AdminSubscriptionListView.as_view(), name="admin_subscriptions"),
+    path("admin/subscriptions/<int:subscription_id>/",api_views.AdminSubscriptionUpdateView.as_view(),name="admin_subscription_update",),
 
+    path('payment/paypal-success/', api_views.PaypalSuccessAPIView.as_view(), name='paypal-success'),
 ]
