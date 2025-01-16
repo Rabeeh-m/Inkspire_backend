@@ -263,10 +263,11 @@ class PopularPostListAPIView(generics.ListAPIView):
     
 class ProfilesListView(generics.ListAPIView):
     serializer_class = api_serializer.ProfileSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user_id = self.kwargs['user_id']
+        # user_id = self.kwargs['user_id']
+        user_id = self.request.user.id
         return api_models.Profile.objects.exclude(user_id__in=[2, user_id])
 
     
@@ -833,6 +834,7 @@ class AdminSubscriptionListView(APIView):
         serializer = api_serializer.SubscriptionSerializer(subscriptions, many=True)
         return Response(serializer.data)
 
+
 class AdminSubscriptionUpdateView(APIView):
     permission_classes = [AllowAny]
 
@@ -848,3 +850,9 @@ class AdminSubscriptionUpdateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except api_models.Subscription.DoesNotExist:
             return Response({"error": "Subscription not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+class AdminSubscriptionDetailView(generics.RetrieveAPIView):
+    queryset = api_models.Subscription.objects.select_related("user")
+    serializer_class = api_serializer.SubscriptionSerializer
+    permission_classes = [AllowAny]

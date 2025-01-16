@@ -60,7 +60,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
-
+    user = UserSerializer(read_only=True)
+    
     class Meta:
         model = api_models.Profile
         fields = '__all__'
@@ -96,11 +97,7 @@ class CategorySerializer(BaseDepthSerializer):
         return category.posts.count()
 
 
-# class CommentSerializer(BaseDepthSerializer):
-#     class Meta:
-#         model = api_models.Comment
-#         fields = "__all__"
-#         default_depth = 1
+
 
 class ReplySerializer(serializers.ModelSerializer):
     class Meta:

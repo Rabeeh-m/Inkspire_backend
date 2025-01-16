@@ -10,12 +10,11 @@ urlpatterns = [
     path('user/register/', api_views.RegisterView.as_view(), name='auth_register'),
     path('user/verify-otp/', api_views.VerifyOTPView.as_view(), name='verify_otp'),
     path('user/profile/<user_id>/', api_views.ProfileView.as_view(), name='user_profile'),
-    path('user/profiles/<user_id>/', api_views.ProfilesListView.as_view(), name='user_profile'),
+    path('user/profiles/', api_views.ProfilesListView.as_view(), name='user_profile'),
     path('user/forgot-password/', api_views.ForgotPasswordView.as_view(), name='forgot-password'),
     path('user/verify-forgotpassword-otp/', api_views.VerifyForgotPasswordOTPView.as_view(), name='verify-forgotpassword-otp'),
     path('user/reset-password/', api_views.ResetPasswordView.as_view(), name='reset-password'),
     path('user/change-password/', api_views.ChangePasswordView.as_view(), name="change-password"),
-    
     
     # Post Endpoints
     path('post/category/list/', api_views.CategoryListAPIView.as_view()),
@@ -51,6 +50,6 @@ urlpatterns = [
     path('admin/posts/<int:post_id>/', api_views.AdminPostEditAPIView.as_view()),
     path("admin/subscriptions/", api_views.AdminSubscriptionListView.as_view(), name="admin_subscriptions"),
     path("admin/subscriptions/<int:subscription_id>/",api_views.AdminSubscriptionUpdateView.as_view(),name="admin_subscription_update",),
-
+    path("admin/subscriptions/<int:pk>/detail/",api_views.AdminSubscriptionDetailView.as_view(),name="admin_subscription_detail",),
     path('payment/paypal-success/', api_views.PaypalSuccessAPIView.as_view(), name='paypal-success'),
 ]
