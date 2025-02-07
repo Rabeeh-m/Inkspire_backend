@@ -34,7 +34,8 @@ from django.utils import timezone
 # Others
 import json
 import random
-
+import uuid
+from django.http import JsonResponse
 
 # Custom Imports
 from api import serializer as api_serializer
@@ -810,14 +811,36 @@ class PaypalSuccessAPIView(APIView):
                 status="active",
                 end_date=timezone.now() + timedelta(days=30)
             )
-
-            return Response(
-                {"success": True, "message": "Payment successful, user upgraded!", "subscription": subscription.id},
-                status=status.HTTP_200_OK,
+        
+            # Generate Invoice Data
+            invoice_id = str(uuid.uuid4())[:8]
+            invoice_data = {
+                "invoice_id": invoice_id,
+                "user_email": user.email,
+                "plan": "Premium",
+                "amount": 9.99,
+                "date": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            
+            # Trigger the Celery task to send the payment success email
+            send_payment_success_email.delay(
+                email=user.email,
+                invoice_id=invoice_id,
+                amount=invoice_data["amount"],
+                plan=invoice_data["plan"],
+                date=invoice_data["date"]
             )
 
+
+            # Return invoice details in the response
+            return JsonResponse({
+                "success": True,
+                "message": "Payment successful, user upgraded!",
+                "subscription_id": subscription.id,
+                "invoice": invoice_data,
+            })
+
         except Exception as e:
-            # Catch any exceptions and return a 500 response
             return Response(
                 {"success": False, "message": "Error processing payment", "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -856,3 +879,148 @@ class AdminSubscriptionDetailView(generics.RetrieveAPIView):
     queryset = api_models.Subscription.objects.select_related("user")
     serializer_class = api_serializer.SubscriptionSerializer
     permission_classes = [AllowAny]
+    
+
+class FollowUnfollowUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, profile_id):
+        try:
+            target_profile = api_models.Profile.objects.get(id=profile_id)
+            user_profile = request.user.profile
+
+            if target_profile == user_profile:
+                return Response(
+                    {"detail": "You cannot follow/unfollow yourself."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if user_profile in target_profile.followers.all():
+                # Unfollow
+                target_profile.followers.remove(user_profile)
+                return Response(
+                    {"detail": "Unfollowed successfully."},
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                # Follow
+                target_profile.followers.add(user_profile)
+                
+                # Create notification for follow action
+                api_models.Notification.objects.create(
+                    user=target_profile.user,
+                    post=None,  # No post in this case
+                    type="Follow",  # This represents the follow action
+                )
+                 
+                return Response(
+                    {"detail": "Followed successfully."},
+                    status=status.HTTP_200_OK,
+                )
+
+        except api_models.Profile.DoesNotExist:
+            return Response(
+                {"detail": "Profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
+from .tasks import test_func, send_payment_success_email
+
+class Test(APIView):
+    def get(self, request):
+        test_func.delay()
+        return Response({"detail": "CELERY TEST DONE"},status=status.HTTP_200_OK,)
+    
+
+
+
+from agora_token_builder import RtcTokenBuilder
+# from .models import RoomMember
+# from .serializers import RoomMemberSerializer
+import time
+
+class GetTokenAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        app_id = "1be2678b4f7b4c34831b89781a29ef2f"
+        app_certificate = "862c7f5e96cb486a8c8c3d18b54266af"
+        channel_name = request.GET.get('channel')
+        uid = random.randint(1, 230)
+        expiration_time_in_seconds = 3600 * 24
+        current_timestamp = int(time.time())
+        privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+        role = 1
+
+        token = RtcTokenBuilder.buildTokenWithUid(app_id, app_certificate, channel_name, uid, role, privilege_expired_ts)
+        return Response({'token': token, 'uid': uid}, status=status.HTTP_200_OK)
+
+
+
+
+class RoomMemberCreateView(APIView):
+
+    def post(self, request):
+        serializer = api_serializer.RoomMemberSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class RoomMemberRetrieveView(APIView):
+
+    def get(self, request):
+        uid = request.GET.get('UID')
+        room_name = request.GET.get('room_name')
+
+        if not uid or not room_name:
+            return Response({'error': 'UID and room_name are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member = get_object_or_404(api_models.RoomMember, uid=uid, room_name=room_name)
+        serializer = api_serializer.RoomMemberSerializer(member)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class RoomMemberDeleteView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+            member = api_models.RoomMember.objects.get(
+                name=data['name'],
+                uid=data['UID'],
+                room_name=data['room_name']
+            )
+            member.delete()
+            return Response({'message': 'Member deleted'}, status=status.HTTP_204_NO_CONTENT)
+        except api_models.RoomMember.DoesNotExist:
+            return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+class ChatRoomView(APIView):
+    def get(self, request, user1_id, user2_id):
+        try:
+            room = api_models.Room.get_or_create_room(user1_id, user2_id)
+            serializer = api_serializer.RoomSerializer(room)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MessageView(APIView):
+    def post(self, request):
+        room_id = request.data.get('room_id')
+        sender_id = request.data.get('sender_id')
+        text = request.data.get('text')
+
+        if not all([room_id, sender_id, text]):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+
+        message = api_models.Message.objects.create(room_id=room_id, sender_id=sender_id, text=text)
+        serializer = api_serializer.MessageSerializer(message)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

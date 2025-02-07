@@ -17,3 +17,9 @@ admin.site.register(api_models.Comment)
 admin.site.register(api_models.Bookmark)
 admin.site.register(api_models.Notification)
 admin.site.register(api_models.Subscription)
+admin.site.register(api_models.Follow)
+
+admin.site.register(api_models.RoomMember)
+
+admin.site.register(api_models.Room)
+admin.site.register(api_models.Message)

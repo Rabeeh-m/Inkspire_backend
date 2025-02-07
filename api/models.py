@@ -9,6 +9,9 @@ from shortuuid.django_fields import ShortUUIDField
 import shortuuid
 from django.conf import settings
 from django.utils.timezone import now, timedelta
+from django.utils import timezone
+
+
         
 
 class User(AbstractUser):
@@ -46,7 +49,16 @@ class Profile(models.Model):
     about = models.TextField(null=True, blank=True)
     is_author = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
+    followers = models.ManyToManyField("self", symmetrical=False, related_name="following", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def follower_count(self):
+        return self.followers.count()
+
+    def following_count(self):
+        # return self.user.profile.following.count()
+        return self.following.count()
+        
 
     def __str__(self):
         return self.full_name if self.full_name else self.user.email
@@ -172,10 +184,11 @@ class Notification(models.Model):
     NOTIFICATION_TYPE = ( 
                          ("Like", "Like"), 
                          ("Comment", "Comment"), 
-                         ("Bookmark", "Bookmark")
+                         ("Bookmark", "Bookmark"),
+                         ("Follow", "Follow"),
                         )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, null=True, blank=True)
     type = models.CharField(max_length=100, choices=NOTIFICATION_TYPE)
     seen = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -200,4 +213,65 @@ class Subscription(models.Model):
     end_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.plan}"
+        return f"{self.user.email} - {self.plan}"    
+         
+
+class Follow(models.Model):
+    follower = models.ForeignKey(User, related_name='following', on_delete=models.CASCADE)
+    followed = models.ForeignKey(User, related_name='followers', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'followed')  # Prevents duplicate follows
+
+    def __str__(self):
+        return f"{self.follower} follows {self.followed}"
+    
+
+class Room(models.Model):
+    participants = models.ManyToManyField(User, related_name="chat_rooms")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Room {self.id}"
+
+    def get_participant_ids(self):
+        return list(self.participants.values_list('id', flat=True))
+
+    @classmethod
+    def get_or_create_room(cls, user1_id, user2_id):
+        # Sort user IDs to ensure consistency
+        user_ids = sorted([user1_id, user2_id])
+        room_name = f"chat_{user_ids[0]}-{user_ids[1]}"
+
+        # Find a room where both participants exist
+        rooms = cls.objects.filter(participants__id__in=user_ids).distinct()
+        for room in rooms:
+            if set(room.get_participant_ids()) == set(user_ids):
+                return room
+
+        # If no room exists, create a new one
+        room = cls.objects.create()
+        room.participants.add(*user_ids)
+        return room
+    
+    
+class Message(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Message from {self.sender} in Room {self.room.id}"
+
+
+
+class RoomMember(models.Model):
+    name = models.CharField(max_length=200)
+    uid = models.CharField(max_length=1000)
+    room_name = models.CharField(max_length=200)
+    insession = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name

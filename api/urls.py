@@ -51,5 +51,17 @@ urlpatterns = [
     path("admin/subscriptions/", api_views.AdminSubscriptionListView.as_view(), name="admin_subscriptions"),
     path("admin/subscriptions/<int:subscription_id>/",api_views.AdminSubscriptionUpdateView.as_view(),name="admin_subscription_update",),
     path("admin/subscriptions/<int:pk>/detail/",api_views.AdminSubscriptionDetailView.as_view(),name="admin_subscription_detail",),
+    
     path('payment/paypal-success/', api_views.PaypalSuccessAPIView.as_view(), name='paypal-success'),
+    path("profile/<int:profile_id>/follow/",api_views.FollowUnfollowUserView.as_view(),name="follow_unfollow",),
+    
+    path("test/",api_views.Test.as_view(),name="test",),
+    
+    path("get_token/",api_views.GetTokenAPIView.as_view(),name="get_token",),
+    path('create_member/', api_views.RoomMemberCreateView.as_view(), name='create-member'),
+    path('get_member/', api_views.RoomMemberRetrieveView.as_view(), name='get-member'),
+    path('delete_member/', api_views.RoomMemberDeleteView.as_view(), name='delete-member'),
+    
+    path('chat-room/<int:user1_id>/<int:user2_id>/', api_views.ChatRoomView.as_view(), name='chat-room'),
+    path('send-message/', api_views.MessageView.as_view(), name='send-message'),
 ]

@@ -61,11 +61,24 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    is_following = serializers.SerializerMethodField()
+    follower_count = serializers.SerializerMethodField()
     
     class Meta:
         model = api_models.Profile
         fields = '__all__'
         
+    def get_is_following(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return request.user.profile in obj.followers.all()
+        return False
+
+    def get_follower_count(self, obj):
+        return obj.follower_count()
+    
+    def get_following_count(self, obj):
+        return obj.following_count()
 
 class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -155,3 +168,25 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         model = api_models.Subscription
         fields = ['id', 'user', 'plan', 'status', 'start_date', 'end_date']
         read_only_fields = ['start_date'] 
+
+
+class RoomMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = api_models.RoomMember
+        fields = '__all__'
+        
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+
+    class Meta:
+        model = api_models.Message
+        fields = '__all__'
+
+class RoomSerializer(serializers.ModelSerializer):
+    participants = UserSerializer(many=True, read_only=True)
+    messages = MessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = api_models.Room
+        fields = '__all__'
