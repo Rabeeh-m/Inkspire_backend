@@ -25,6 +25,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAdminUser
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -1013,14 +1014,22 @@ class ChatRoomView(APIView):
 
 
 class MessageView(APIView):
+    parser_classes = [MultiPartParser, FormParser]  # Add this to handle file uploads
+
     def post(self, request):
         room_id = request.data.get('room_id')
         sender_id = request.data.get('sender_id')
         text = request.data.get('text')
+        file = request.FILES.get('file')  # Get the uploaded file
 
-        if not all([room_id, sender_id, text]):
+        if not all([room_id, sender_id]) and not (text or file):
             return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
-        message = api_models.Message.objects.create(room_id=room_id, sender_id=sender_id, text=text)
-        serializer = api_serializer.MessageSerializer(message)
+        message = api_models.Message.objects.create(
+            room_id=room_id,
+            sender_id=sender_id,
+            text=text,
+            file=file,  # Save the file
+        )
+        serializer = api_serializer.MessageSerializer(message, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -178,10 +178,16 @@ class RoomMemberSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    file = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
         model = api_models.Message
         fields = '__all__'
+        
+    def get_file(self, obj):
+        if obj.file:
+            return self.context['request'].build_absolute_uri(obj.file.url)
+        return None
 
 class RoomSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)
