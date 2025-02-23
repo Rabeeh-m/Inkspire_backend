@@ -40,6 +40,16 @@ DATABASES = {
     )
 }
 
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",

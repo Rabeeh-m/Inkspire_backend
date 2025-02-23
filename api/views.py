@@ -1,4 +1,5 @@
 import redis
+import os
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.mail import EmailMultiAlternatives
@@ -48,7 +49,10 @@ from api import models as api_models
 
 # Create your views here.
 
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
+
+# redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 
 class UserTokenObtainPairView(TokenObtainPairView):
@@ -110,7 +114,7 @@ class VerifyOTPView(APIView):
         if stored_otp is None:
             return Response({'error': 'OTP expired. Please request a new one.'}, status=400)
 
-        if stored_otp.decode() != otp:
+        if stored_otp != otp:  # if stored_otp.decode() != otp:
             return Response({'error': 'Invalid OTP'}, status=400)
 
         # Create the user after OTP is verified
@@ -134,9 +138,11 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         profile = api_models.Profile.objects.get(user = user)
         return profile
        
-        
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+redis_instance = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
+
 # Redis configuration for OTP storage
-redis_instance = redis.StrictRedis(host='localhost', port=6379, db=0)
+# redis_instance = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 class ForgotPasswordView(APIView):
     def post(self, request):
@@ -170,7 +176,7 @@ class VerifyForgotPasswordOTPView(APIView):
             return Response({"error": "Email and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         stored_otp = redis_instance.get(f"forgot-password-otp-{email}")
-        if not stored_otp or stored_otp.decode() != otp:
+        if not stored_otp or stored_otp != otp:  #if not stored_otp or stored_otp.decode() != otp:
             return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"message": "OTP verified."}, status=status.HTTP_200_OK)
