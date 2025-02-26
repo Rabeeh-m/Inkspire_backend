@@ -49,7 +49,7 @@ STORAGES = {
     },
     "staticfiles": {
         "BACKEND" : "whitenoise.storage.CompressedStaticFilesStorage",
-    },,
+    },
 }
 
 
