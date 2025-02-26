@@ -40,15 +40,11 @@ AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'eu-north-1')
 AWS_S3_CUSTOM_DOMAIN = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
 AWS_S3_FILE_OVERWRITE = False
 
-# # Static and Media URLs
-STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
+
 MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 
 STORAGES = {
     "default": {
-        "BACKEND": "storages.backends.s3.S3Storage",
-    },
-    "staticfiles": {
         "BACKEND": "storages.backends.s3.S3Storage",
     },
 }
