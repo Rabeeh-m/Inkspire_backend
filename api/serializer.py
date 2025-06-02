@@ -110,6 +110,16 @@ class CategorySerializer(BaseDepthSerializer):
         return category.posts.count()
 
 
+class CategoryCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = api_models.Category
+        fields = ["id", "title", "slug"]
+        read_only_fields = ["slug"]
+
+    def validate_title(self, value):
+        if api_models.Category.objects.filter(title__iexact=value).exists():
+            raise serializers.ValidationError("Category with this title already exists.")
+        return value
 
 
 class ReplySerializer(serializers.ModelSerializer):

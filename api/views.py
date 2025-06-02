@@ -9,12 +9,10 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.db.models import Sum
-
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.hashers import check_password
 from django.shortcuts import get_object_or_404
-
 # Restframework
 from rest_framework import status
 from rest_framework.decorators import api_view, APIView
@@ -27,32 +25,23 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
-
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from datetime import timedelta
 from django.utils import timezone 
-
 # Others
 import json
 import random
 import uuid
 from django.http import JsonResponse
-
 # Custom Imports
 from api import serializer as api_serializer
 from api import models as api_models
 
 
-
-
-
 # Create your views here.
-
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
-
-# redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 
 class UserTokenObtainPairView(TokenObtainPairView):
@@ -72,7 +61,6 @@ def generate_numeric_otp(length=6):
         # Generate a random 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(length)])
         return otp
- 
  
 
 class RegisterView(APIView):
@@ -102,8 +90,6 @@ class RegisterView(APIView):
         return Response({"message": "OTP sent to your email."})
  
  
- 
- 
 class VerifyOTPView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -125,9 +111,6 @@ class VerifyOTPView(APIView):
         return Response({'message': 'Registration successful.'})
  
  
- 
- 
- 
 class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = api_serializer.ProfileSerializer
@@ -141,8 +124,6 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 redis_instance = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
 
-# Redis configuration for OTP storage
-# redis_instance = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 class ForgotPasswordView(APIView):
     def post(self, request):
@@ -239,6 +220,37 @@ class CategoryListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         return api_models.Category.objects.all()
+
+
+class CategoryCreateAPIView(generics.CreateAPIView):
+    serializer_class = api_serializer.CategoryCreateUpdateSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"message": "Category created successfully.", "data": serializer.data}, status=status.HTTP_201_CREATED)
+
+class CategoryDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = api_serializer.CategoryCreateUpdateSerializer
+    permission_classes = [AllowAny]
+    
+    def get_object(self):
+        category_id = self.kwargs['category_id']
+        return get_object_or_404(api_models.Category, id=category_id)
+
+    def update(self, request, *args, **kwargs):
+        category = self.get_object()
+        serializer = self.get_serializer(category, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({"message": "Category updated successfully.", "data": serializer.data}, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        category = self.get_object()
+        category.delete()
+        return Response({"message": "Category deleted successfully."}, status=status.HTTP_200_OK)
     
 
 class PostCategoryListAPIView(generics.ListAPIView):
